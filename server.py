@@ -2,11 +2,18 @@
 """
 MCP Trading Quantitative Analysis Server
 
-This server provides 12 tools for quantitative trading analysis:
-- 3 market data tools
-- 4 technical indicator tools
-- 2 news analysis tools
-- 3 trading signal tools
+Servidor MCP que proporciona 12 herramientas para análisis cuantitativo de trading:
+- 3 herramientas de datos de mercado (precios, históricos, quotes)
+- 4 herramientas de indicadores técnicos (tendencia, momentum, volatilidad, volumen)
+- 2 herramientas de análisis de noticias (búsqueda y sentiment con FinBERT)
+- 3 herramientas de señales de trading (técnicas, fundamentales, híbridas)
+
+Este servidor implementa el protocolo MCP (Model Context Protocol) de Anthropic,
+permitiendo a Claude AI acceder a datos financieros en tiempo real y realizar
+análisis cuantitativos complejos.
+
+Author: j840425
+Version: 1.0.0
 """
 
 import json
@@ -19,20 +26,36 @@ from src.indicators import IndicatorCalculator
 from src.news_analysis import NewsClient, SentimentAnalyzer
 from src.signals import SignalGenerator
 
-# Initialize server
+# Inicializar el servidor MCP con identificador único
 server = Server("mcp-trading-server")
 
-# Initialize clients and analyzers
-market_client = AlphaVantageClient()
-indicator_calculator = IndicatorCalculator()
-news_client = NewsClient()
-sentiment_analyzer = SentimentAnalyzer()
-signal_generator = SignalGenerator()
+# Inicializar clientes y analizadores
+# Estos objetos se instancian una sola vez y se reutilizan para todas las llamadas
+market_client = AlphaVantageClient()  # Cliente Alpha Vantage para datos de mercado
+indicator_calculator = IndicatorCalculator()  # Calculadora de indicadores técnicos
+news_client = NewsClient()  # Cliente NewsData.io para noticias
+sentiment_analyzer = SentimentAnalyzer()  # Analizador FinBERT para sentiment
+signal_generator = SignalGenerator()  # Generador de señales de trading
 
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List all available trading analysis tools"""
+    """
+    Lista todas las herramientas MCP disponibles.
+
+    Esta función es llamada por Claude cuando inicia la conexión con el servidor
+    para descubrir qué herramientas están disponibles y cómo usarlas.
+
+    Returns:
+        list[Tool]: Lista de 12 objetos Tool con sus definiciones, schemas y descripciones.
+                    Cada Tool incluye:
+                    - name: Identificador único de la herramienta
+                    - description: Descripción de qué hace y cuándo usarla
+                    - inputSchema: JSON Schema que define los parámetros requeridos
+
+    Note:
+        Las descripciones DEBEN estar en inglés para que Claude las interprete correctamente.
+    """
     return [
         # Market Data Tools (3)
         Tool(
@@ -322,35 +345,69 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Handle tool calls"""
+    """
+    Maneja las llamadas a las herramientas MCP.
+
+    Esta función es invocada por Claude cuando decide usar una herramienta.
+    Recibe el nombre de la herramienta y sus argumentos, ejecuta la lógica
+    correspondiente y devuelve el resultado en formato JSON.
+
+    Args:
+        name (str): Nombre de la herramienta a ejecutar (ej: "get_current_price")
+        arguments (dict): Diccionario con los parámetros de la herramienta
+                         (ej: {"symbol": "AAPL"})
+
+    Returns:
+        list[TextContent]: Lista con un objeto TextContent que contiene:
+                          - El resultado en formato JSON si la ejecución fue exitosa
+                          - Un objeto de error en JSON si ocurrió una excepción
+
+    Raises:
+        No lanza excepciones directamente, todas se capturan y se devuelven como JSON.
+
+    Example:
+        >>> # Claude llama: get_current_price con {"symbol": "AAPL"}
+        >>> # Servidor devuelve: {"symbol": "AAPL", "price": 178.45, ...}
+    """
 
     try:
-        # Market Data Tools
+        # ============================================================
+        # MARKET DATA TOOLS (3)
+        # Herramientas para obtener datos de mercado de Alpha Vantage
+        # ============================================================
+
         if name == "get_current_price":
             result = market_client.get_current_price(arguments["symbol"])
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_historical_data":
+            # Obtener datos históricos OHLCV del mercado
             df = market_client.get_historical_data(
                 symbol=arguments["symbol"],
                 start_date=arguments["start_date"],
                 end_date=arguments["end_date"],
                 interval=arguments.get("interval", "daily")
             )
+            # Formatear respuesta limitando a 100 filas para evitar payloads muy grandes
             result = {
                 "symbol": arguments["symbol"],
                 "rows": len(df),
                 "columns": list(df.columns),
                 "date_range": f"{df.index[0]} to {df.index[-1]}",
-                "data": df.to_dict(orient="records")[:100]  # Limit to first 100 rows
+                "data": df.to_dict(orient="records")[:100]  # Limitar a primeras 100 filas
             }
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_quote_info":
+            # Obtener información completa del activo (precio + fundamentales)
             result = market_client.get_quote_info(arguments["symbol"])
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
-        # Technical Indicator Tools
+        # ============================================================
+        # TECHNICAL INDICATOR TOOLS (4)
+        # Herramientas para calcular indicadores técnicos con pandas-ta
+        # ============================================================
+
         elif name == "calculate_trend_indicators":
             result = indicator_calculator.calculate_trend_indicators(
                 symbol=arguments["symbol"],
@@ -383,7 +440,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
-        # News Analysis Tools
+        # ============================================================
+        # NEWS ANALYSIS TOOLS (2)
+        # Herramientas para análisis de noticias y sentiment con FinBERT
+        # ============================================================
+
         elif name == "get_financial_news":
             result = news_client.get_financial_news(
                 symbol=arguments["symbol"],
@@ -399,7 +460,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
-        # Trading Signal Tools
+        # ============================================================
+        # TRADING SIGNAL TOOLS (3)
+        # Herramientas para generar señales de trading (BUY/SELL/HOLD)
+        # ============================================================
+
         elif name == "generate_technical_signal":
             result = signal_generator.generate_technical_signal(
                 symbol=arguments["symbol"],
@@ -427,9 +492,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         else:
+            # Herramienta desconocida
             raise ValueError(f"Unknown tool: {name}")
 
     except Exception as e:
+        # Capturar cualquier error y devolverlo en formato JSON
+        # Esto permite que Claude vea el error y pueda informar al usuario
         error_result = {
             "error": str(e),
             "tool": name,
@@ -439,7 +507,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def main():
-    """Run the MCP server"""
+    """
+    Función principal que inicia el servidor MCP.
+
+    Crea un servidor stdio (comunicación por entrada/salida estándar) y
+    ejecuta el loop principal del servidor MCP. El servidor permanece
+    activo esperando comandos de Claude hasta que se cierra la conexión.
+
+    Este es el punto de entrada cuando Claude ejecuta el comando configurado
+    en .mcp.json o claude_desktop_config.json.
+    """
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
@@ -449,5 +526,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Punto de entrada cuando se ejecuta directamente: python server.py
     import asyncio
     asyncio.run(main())
