@@ -1,0 +1,22 @@
+# MCP SDK
+mcp>=1.0.0
+
+# APIs and HTTP
+requests
+python-dotenv
+
+# Data manipulation
+pandas
+numpy
+
+# Technical analysis
+pandas-ta
+
+# NLP and Sentiment Analysis
+transformers
+torch
+sentencepiece
+
+# Utilities
+python-dateutil
+pytz

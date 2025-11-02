@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "trading-quantitative": {
+      "command": "/home/jean/proyectos/pry_mcp_trading/.venv/bin/python",
+      "args": [
+        "server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/jean/proyectos/pry_mcp_trading"
+      }
+    }
+  }
+}
