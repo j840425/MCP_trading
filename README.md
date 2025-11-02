@@ -145,7 +145,6 @@ Deberías ver las 12 herramientas de trading listadas.
 pry_mcp_trading/
 ├── server.py                    # Servidor MCP principal
 ├── requirements.txt             # Dependencias Python
-├── .env                         # API keys (no subir a git)
 ├── .env.example                 # Plantilla de configuración
 ├── .mcp.json                    # Config MCP para Claude Code
 ├── setup.sh                     # Script de instalación
@@ -469,17 +468,6 @@ python -c "from src.market_data import AlphaVantageClient; \
 # Ejecutar servidor manualmente
 python server.py
 ```
-
-### Extensiones Futuras
-- [ ] Soporte para criptomonedas (Binance, CoinGecko)
-- [ ] Backtesting automatizado de estrategias
-- [ ] Alertas en tiempo real vía webhooks
-- [ ] Dashboard web con Streamlit/Dash
-- [ ] Base de datos para histórico (PostgreSQL)
-- [ ] Machine Learning para optimización de parámetros
-- [ ] Paper trading con brokers (Alpaca, Interactive Brokers)
-- [ ] Caché distribuido con Redis
-- [ ] Análisis de correlaciones entre activos
 
 ## 🌐 Recursos
 
